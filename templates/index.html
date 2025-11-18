@@ -2,69 +2,200 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PaoPao</title>
-  <style>
-    .board { display: flex; flex-direction: column; align-items: center; }
-    .row { display: flex; }
-    .tile {
-      width: 60px;
-      height: 60px;
-      font-size: 10px;
-      text-align: center;
-      line-height: 60px;
-      border: 1px solid #ccc;
-      margin: 2px;
-      background-color: #f2f2f2;
-    }
-    .selected { background-color: #b3d9ff; }
-    .tile a { display: block; width: 100%; height: 100%; text-decoration: none; color: inherit; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PaoPao - Play</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-  <h1>PaoPao Game for Mental Calc</h1>
-  <div id="progress-container" style="width: 100%; background-color: #ddd;">
-    <div id="progress-bar" style="height: 10px; background-color: rgb(101, 105, 112); width: 100%;"></div>
-  </div>
-  <p id="time-left" style="font-weight: bold;">Time left: <span id="time">{{time_left}}</span> seconds</p>
-<div style="margin: 20px;">
-    <a href="{{ url_for('set_difficulty', level='easy') }}"><button>Easy</button></a>
-    <a href="{{ url_for('set_difficulty', level='medium') }}"><button>Medium</button></a>
-    <a href="{{ url_for('set_difficulty', level='profi') }}"><button>Profi</button></a>
-  </div>
-  <div class="board">
-    {% for row_idx, row in board_with_indices %}
-      <div class="row">
-        {% for col_idx, emoji in row %}
-          <div class="tile {% if (row_idx, col_idx) in selected %}selected{% endif %}">
-            {% if emoji %}
-              <a href="{{ url_for('select_tile', row=row_idx, col=col_idx) }}">{{ emoji }}</a>
-            {% else %}
-              &nbsp;
-            {% endif %}
+<body class="game-page">
+  <div class="container">
+    <div class="game-header">
+      <h1>PaoPao</h1>
+    </div>
+
+    <div class="timer-section">
+      <div class="progress-container">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+      <div class="time-display">
+        Time left: <span id="time">{{ time_left }}</span>s
+      </div>
+    </div>
+
+    <div class="controls">
+      <a href="/" class="btn btn-home">🏠 Home</a>
+      <a href="{{ url_for('set_difficulty', level='easy') }}" class="btn btn-easy">🌱 Easy</a>
+      <a href="{{ url_for('set_difficulty', level='medium') }}" class="btn btn-medium">🔥 Medium</a>
+      <a href="{{ url_for('set_difficulty', level='profi') }}" class="btn btn-profi">⚡ Profi</a>
+    </div>
+
+    <div class="board-container">
+      <div class="board" id="game-board">
+        {% for row_idx, row in board_with_indices %}
+          <div class="row" data-row="{{ row_idx }}">
+            {% for col_idx, emoji in row %}
+              <div class="tile {% if emoji %}tile-filled{% else %}tile-empty{% endif %} {% if (row_idx, col_idx) in selected %}tile-selected{% endif %}"
+                   data-row="{{ row_idx }}"
+                   data-col="{{ col_idx }}"
+                   {% if emoji %}onclick="selectTile({{ row_idx }}, {{ col_idx }})"{% endif %}>
+                {% if emoji %}
+                  <span>{{ emoji }}</span>
+                {% endif %}
+              </div>
+            {% endfor %}
           </div>
         {% endfor %}
       </div>
-    {% endfor %}
+    </div>
   </div>
 
   <script>
     let total = {{ time_limit }};
     let timeLeft = {{ time_left }};
     const bar = document.getElementById("progress-bar");
+    const timeDisplay = document.getElementById("time");
 
-    function updateBar() {
+    function updateTimer() {
       if (timeLeft <= 0) {
-        clearInterval(timer);
         window.location.href = "/timeout";
       } else {
         let percent = (timeLeft / total) * 100;
         bar.style.width = percent + "%";
-        document.getElementById("time-left").innerText = `Time left: ${timeLeft} seconds`;
+
+        // Change color based on time remaining
+        if (percent > 50) {
+          bar.className = "progress-bar";
+        } else if (percent > 25) {
+          bar.className = "progress-bar warning";
+        } else {
+          bar.className = "progress-bar danger";
+        }
+
+        // Format time display
+        let minutes = Math.floor(timeLeft / 60);
+        let seconds = timeLeft % 60;
+        timeDisplay.textContent = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
         timeLeft -= 1;
       }
     }
 
-    setInterval(updateBar, 1000);
+    // Update immediately on load
+    updateTimer();
+
+    // Then update every second
+    setInterval(updateTimer, 1000);
+
+    // AJAX tile selection - no page reload!
+    async function selectTile(row, col) {
+      try {
+        const response = await fetch(`/api/select/${row}/${col}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          console.error('Failed to select tile');
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.game_won) {
+          // Show winning message and redirect to congrats page
+          showMessage('🎉 You Won! 🎉');
+          setTimeout(() => {
+            window.location.href = '/congrats';
+          }, 1000);
+          return;
+        }
+
+        // Update the board UI
+        updateBoard(data.board, data.selected);
+
+        if (data.reshuffled) {
+          showMessage('Board reshuffled! 🔄');
+        }
+        // Removed the "Match!" message for cleaner UX
+
+      } catch (error) {
+        console.error('Error selecting tile:', error);
+      }
+    }
+
+    function updateBoard(boardData, selected) {
+      const boardElement = document.getElementById('game-board');
+      const rows = boardElement.querySelectorAll('.row');
+
+      boardData.forEach((rowData, rowIdx) => {
+        const rowElement = rows[rowIdx];
+        const tiles = rowElement.querySelectorAll('.tile');
+
+        rowData.forEach((cellValue, colIdx) => {
+          const tile = tiles[colIdx];
+          const isSelected = selected.some(s => s[0] === rowIdx && s[1] === colIdx);
+
+          // Update tile content
+          if (cellValue === null) {
+            tile.className = 'tile tile-empty';
+            tile.innerHTML = '';
+            tile.onclick = null;
+          } else {
+            tile.className = 'tile tile-filled' + (isSelected ? ' tile-selected' : '');
+            tile.innerHTML = `<span>${cellValue}</span>`;
+            tile.onclick = () => selectTile(rowIdx, colIdx);
+          }
+        });
+      });
+    }
+
+    function showMessage(msg) {
+      const existingMsg = document.querySelector('.game-message');
+      if (existingMsg) {
+        existingMsg.remove();
+      }
+
+      const message = document.createElement('div');
+      message.className = 'game-message';
+      message.textContent = msg;
+      document.querySelector('.game-header').appendChild(message);
+
+      setTimeout(() => {
+        message.style.opacity = '0';
+        setTimeout(() => message.remove(), 300);
+      }, 1500);
+    }
   </script>
+
+  <style>
+    .game-message {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(102, 126, 234, 0.95);
+      color: white;
+      padding: 20px 40px;
+      border-radius: 15px;
+      font-size: 1.5rem;
+      font-weight: bold;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      transition: opacity 0.3s;
+      animation: popIn 0.3s ease;
+    }
+
+    @keyframes popIn {
+      0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+      }
+    }
+  </style>
 </body>
 </html>

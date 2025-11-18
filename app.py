@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, session
+from flask import Flask, render_template, redirect, url_for, request, session, jsonify
 import random
 from collections import deque
 import time
@@ -81,7 +81,7 @@ def init_game(level='easy'):
     global board, selected, pairs, reverse_pairs, board_size, TIME_LIMIT
     selected = []
 
-    
+
     if level == 'easy':
         board_size = 6
         pairs = dict(generate_easy_pairs())
@@ -101,6 +101,13 @@ def init_game(level='easy'):
 
     reverse_pairs = {v: k for k, v in pairs.items()}
     generate_valid_board()
+
+    # Store in session
+    session['board'] = board
+    session['pairs'] = pairs
+    session['reverse_pairs'] = reverse_pairs
+    session['board_size'] = board_size
+    session['selected'] = []
 
 
 
@@ -204,69 +211,155 @@ def reshuffle_board():
 
 
 
+@app.route('/')
+def landing():
+    return render_template('landing.html')
+
+@app.route('/start/<level>')
+def start_game(level):
+    session['difficulty'] = level
+    init_game(level)
+    session['end_time'] = time.time() + TIME_LIMIT
+    return redirect(url_for('game'))
+
 @app.route('/set_difficulty/<level>')
 def set_difficulty(level):
     session['difficulty'] = level
     init_game(level)
     session['end_time'] = time.time() + TIME_LIMIT
-    return redirect(url_for('index'))
+    return redirect(url_for('game'))
 
 
 @app.route('/reset')
 def reset():
     init_game('easy')
     session['end_time'] = time.time() + TIME_LIMIT
-    return redirect(url_for('index'))
+    return redirect(url_for('game'))
 
 @app.route('/timeout')
 def timeout():
     return render_template('game_over.html')
 
+@app.route('/congrats')
+def congrats():
+    return render_template('congrats.html')
 
-@app.route('/')
-def index():
+
+@app.route('/game')
+def game():
     time_left = int(max(0, session.get('end_time', time.time()) - time.time()))
     if time_left <= 0:
         return redirect(url_for('timeout'))
 
-    cropped_board = [row[1:-1] for row in board[1:-1]]
+    # Load state from session
+    current_board = session.get('board', board)
+    current_selected = session.get('selected', [])
+
+    cropped_board = [row[1:-1] for row in current_board[1:-1]]
     board_with_indices = [(i, list(enumerate(row))) for i, row in enumerate(cropped_board)]
     message = None
-    return render_template('index.html', board_with_indices=board_with_indices, selected=selected, time_left=time_left, time_limit=TIME_LIMIT)
+    return render_template('index.html', board_with_indices=board_with_indices, selected=current_selected, time_left=time_left, time_limit=TIME_LIMIT)
+
+@app.route('/api/select/<int:row>/<int:col>', methods=['POST'])
+def api_select_tile(row, col):
+    """AJAX endpoint for tile selection - no page reload"""
+    # Load state from session
+    current_board = session.get('board')
+    if not current_board:
+        return jsonify({'error': 'No game in progress'}), 400
+
+    current_selected = session.get('selected', [])
+    current_pairs = session.get('pairs', {})
+    current_reverse_pairs = session.get('reverse_pairs', {})
+    current_board_size = session.get('board_size', 6)
+
+    # Convert selected to list of tuples if needed
+    current_selected = [tuple(item) if isinstance(item, list) else item for item in current_selected]
+
+    if (row, col) in current_selected:
+        current_selected.remove((row, col))
+    else:
+        current_selected.append((row, col))
+
+    matched = False
+    reshuffled = False
+    game_won = False
+
+    if len(current_selected) == 2:
+        (r1, c1), (r2, c2) = current_selected
+        word1, word2 = current_board[r1+1][c1+1], current_board[r2+1][c2+1]
+
+        # Check if match using session pairs
+        is_valid_match = (current_pairs.get(word1) == word2) or (current_reverse_pairs.get(word1) == word2)
+
+        if is_valid_match and is_path_clear(current_board, r1+1, c1+1, r2+1, c2+1):
+            current_board[r1+1][c1+1] = None
+            current_board[r2+1][c2+1] = None
+            matched = True
+
+        current_selected = []
+        remaining = [cell for row in current_board for cell in row if cell]
+
+        # Update session with modified board
+        session['board'] = current_board
+        session['selected'] = current_selected
+
+        if not remaining:
+            game_won = True
+
+        # Check if valid moves exist
+        if not game_won:
+            items = [(r, c) for r in range(len(current_board)) for c in range(len(current_board[0])) if current_board[r][c]]
+            has_moves = False
+            for i, (r1, c1) in enumerate(items):
+                for r2, c2 in items[i+1:]:
+                    w1, w2 = current_board[r1][c1], current_board[r2][c2]
+                    is_valid = (current_pairs.get(w1) == w2) or (current_reverse_pairs.get(w1) == w2)
+                    if is_valid and is_path_clear(current_board, r1, c1, r2, c2):
+                        has_moves = True
+                        break
+                if has_moves:
+                    break
+
+            if not has_moves:
+                # Reshuffle
+                flat = [current_board[i][j] for i in range(1, current_board_size+1) for j in range(1, current_board_size+1) if current_board[i][j] is not None]
+                if flat:
+                    random.shuffle(flat)
+                    idx = 0
+                    for i in range(1, current_board_size+1):
+                        for j in range(1, current_board_size+1):
+                            if current_board[i][j] is not None:
+                                current_board[i][j] = flat[idx]
+                                idx += 1
+                    session['board'] = current_board
+                    reshuffled = True
+    else:
+        # Update selected in session
+        session['selected'] = current_selected
+
+    # Return updated board state
+    cropped_board = [row[1:-1] for row in current_board[1:-1]]
+
+    return jsonify({
+        'success': True,
+        'board': cropped_board,
+        'selected': current_selected,
+        'matched': matched,
+        'reshuffled': reshuffled,
+        'game_won': game_won
+    })
 
 @app.route('/select/<int:row>/<int:col>')
 def select_tile(row, col):
-    global selected, board
-    if (row, col) in selected:
-        selected.remove((row, col))
-    else:
-        selected.append((row, col))
-
-    if len(selected) == 2:
-        (r1, c1), (r2, c2) = selected
-        word1, word2 = board[r1+1][c1+1], board[r2+1][c2+1]
-
-        if is_match(word1, word2) and is_path_clear(board, r1+1, c1+1, r2+1, c2+1):
-            board[r1+1][c1+1] = None
-            board[r2+1][c2+1] = None
-
-        selected = []
-        remaining = [cell for row in board for cell in row if cell]
-        if not remaining:
-            return render_template('congrats.html')
-
-        if not has_valid_moves():
-            reshuffled = reshuffle_board()
-            if not reshuffled:
-                return render_template('congrats.html')
-
-    return redirect(url_for('index'))
+    """Fallback route for non-JS browsers"""
+    return redirect(url_for('game'))
 
 
 
 
 if __name__ == '__main__':
-    init_game('easy')
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
-    # app.run(debug=True)
+    # Don't initialize session outside request context
+    # port = int(os.environ.get('PORT', 5000))
+    # app.run(host='0.0.0.0', port=port)
+    app.run(debug=True)

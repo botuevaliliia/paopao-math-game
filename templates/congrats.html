@@ -1,8 +1,85 @@
 <!DOCTYPE html>
-<html>
-<head><title>Game Over</title></head>
-<body>
-  <h1>🎉 Congrats, you cleared the board! 🎉</h1>
-  <a href="{{ url_for('reset') }}" class="btn">Start Again</a>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Congratulations! - PaoPao</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="end-page">
+  <div class="container">
+    <div class="end-content">
+      <h1>🎉 Congratulations! 🎉</h1>
+      <p>You cleared the board!</p>
+      <p class="victory-message">Your mental math skills are impressive!</p>
+
+      <div class="end-actions">
+        <a href="/" class="btn btn-large">🏠 Back to Home</a>
+        <a href="{{ url_for('reset') }}" class="btn btn-large" style="background: linear-gradient(135deg, #10b981, #34d399); margin-top: 10px;">
+          🔄 Play Again
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .victory-message {
+      font-size: 1.1rem;
+      color: #667eea;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .end-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-width: 300px;
+      margin: 0 auto;
+    }
+
+    @keyframes confetti {
+      0% {
+        transform: translateY(-100vh) rotate(0deg);
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+      }
+    }
+  </style>
+
+  <script>
+    // Add some celebratory animation
+    document.addEventListener('DOMContentLoaded', function() {
+      const colors = ['#667eea', '#764ba2', '#10b981', '#f59e0b', '#ef4444'];
+      for (let i = 0; i < 50; i++) {
+        setTimeout(() => {
+          createConfetti();
+        }, i * 50);
+      }
+    });
+
+    function createConfetti() {
+      const confetti = document.createElement('div');
+      confetti.style.position = 'fixed';
+      confetti.style.left = Math.random() * 100 + 'vw';
+      confetti.style.top = '-10px';
+      confetti.style.width = '10px';
+      confetti.style.height = '10px';
+      confetti.style.backgroundColor = ['#667eea', '#764ba2', '#10b981', '#f59e0b', '#ef4444'][Math.floor(Math.random() * 5)];
+      confetti.style.opacity = '1';
+      confetti.style.animation = `confetti ${2 + Math.random() * 2}s linear`;
+      confetti.style.pointerEvents = 'none';
+      confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+      document.body.appendChild(confetti);
+
+      setTimeout(() => {
+        confetti.remove();
+      }, 4000);
+    }
+  </script>
 </body>
 </html>

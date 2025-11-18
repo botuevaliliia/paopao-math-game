@@ -1,11 +1,43 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Game Over</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Time's Up! - PaoPao</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-    <h1>⏰ Time’s up!</h1>
-    <p>Better luck next time. Try a different difficulty?</p>
-    <a href="{{ url_for('reset') }}" class="btn">Start Again</a>
+<body class="end-page">
+  <div class="container">
+    <div class="end-content">
+      <h1>⏰ Time's Up!</h1>
+      <p>Don't worry, practice makes perfect!</p>
+      <p class="encouragement">Try a different difficulty level or give it another shot.</p>
+
+      <div class="end-actions">
+        <a href="/" class="btn btn-large">🏠 Back to Home</a>
+        <a href="{{ url_for('reset') }}" class="btn btn-large" style="background: linear-gradient(135deg, #f59e0b, #fbbf24); margin-top: 10px;">
+          🔄 Try Again
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .encouragement {
+      font-size: 1rem;
+      color: #666;
+      margin-top: 10px;
+      font-style: italic;
+    }
+
+    .end-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-width: 300px;
+      margin: 0 auto;
+    }
+  </style>
 </body>
 </html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PaoPao - Mental Math Game</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="landing-page">
+  <div class="container">
+    <div class="landing-content">
+      <h1 class="game-title">
+        <span class="title-bubble">🎮</span>
+        <span class="title-main">PaoPao</span>
+        <span class="title-bubble">🎯</span>
+      </h1>
+      <p class="game-subtitle">Mental Math Matching Game</p>
+
+      <div class="game-description">
+        <p>Match mathematical expressions with their answers!</p>
+        <p>Clear the board before time runs out.</p>
+      </div>
+
+      <div class="difficulty-selection">
+        <h2>Choose Your Difficulty</h2>
+        <div class="difficulty-cards">
+          <div class="difficulty-card easy-card" onclick="selectDifficulty('easy')">
+            <div class="card-icon">🌱</div>
+            <h3>Easy</h3>
+            <div class="card-details">
+              <p>6×6 Grid</p>
+              <p>Simple multiplication</p>
+              <p class="time-info">⏱️ 4 minutes</p>
+            </div>
+          </div>
+
+          <div class="difficulty-card medium-card" onclick="selectDifficulty('medium')">
+            <div class="card-icon">🔥</div>
+            <h3>Medium</h3>
+            <div class="card-details">
+              <p>8×8 Grid</p>
+              <p>Multiplication & Division</p>
+              <p class="time-info">⏱️ 8 minutes</p>
+            </div>
+          </div>
+
+          <div class="difficulty-card profi-card" onclick="selectDifficulty('profi')">
+            <div class="card-icon">⚡</div>
+            <h3>Profi</h3>
+            <div class="card-details">
+              <p>10×10 Grid</p>
+              <p>Advanced expressions</p>
+              <p class="time-info">⏱️ 16 minutes</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="how-to-play">
+        <details>
+          <summary>How to Play</summary>
+          <ol>
+            <li>Select two tiles that match (e.g., "6×7" and "42")</li>
+            <li>Tiles can connect with up to 2 turns in the path</li>
+            <li>Clear all tiles before time runs out</li>
+            <li>If no moves available, the board reshuffles automatically</li>
+          </ol>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function selectDifficulty(level) {
+      const cards = document.querySelectorAll('.difficulty-card');
+      cards.forEach(card => {
+        card.style.transform = 'scale(0.95)';
+        card.style.opacity = '0.6';
+      });
+
+      setTimeout(() => {
+        window.location.href = `/start/${level}`;
+      }, 200);
+    }
+  </script>
+</body>
+</html>
